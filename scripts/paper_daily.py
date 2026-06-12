@@ -3,6 +3,7 @@ import datetime as dt
 import json
 import os
 import re
+import urllib.error
 import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
@@ -34,8 +35,13 @@ def fetch_arxiv(query: str, max_results: int):
         {"search_query": query, "start": 0, "max_results": max_results, "sortBy": "submittedDate", "sortOrder": "descending"}
     )
     url = f"{ARXIV_API}?{params}"
-    with urllib.request.urlopen(url, timeout=30) as resp:
-        xml_data = resp.read()
+    try:
+        with urllib.request.urlopen(url, timeout=30) as resp:
+            xml_data = resp.read()
+    except urllib.error.HTTPError as exc:
+        raise RuntimeError(f"HTTP {exc.code}") from exc
+    except urllib.error.URLError as exc:
+        raise RuntimeError(f"Network error: {exc.reason}") from exc
     root = ET.fromstring(xml_data)
     ns = {"atom": "http://www.w3.org/2005/Atom"}
     papers = []
@@ -73,7 +79,11 @@ def translate_to_zh(text: str) -> str:
     try:
         with urllib.request.urlopen(req, timeout=60) as resp:
             result = json.loads(resp.read().decode("utf-8"))
-        content = result["choices"][0]["message"]["content"].strip()
+        choices = result.get("choices") or []
+        message = choices[0].get("message", {}) if choices else {}
+        content = str(message.get("content", "")).strip()
+        if not content:
+            return "翻译失败: 响应中没有可用内容。"
         return content
     except Exception as exc:
         return f"翻译失败: {exc}"
