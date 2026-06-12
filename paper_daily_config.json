@@ -1,0 +1,4 @@
+{
+  "query": "cat:cs.AI OR cat:cs.CL OR cat:cs.CV",
+  "max_results": 5
+}
